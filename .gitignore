@@ -1,0 +1,42 @@
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+*.egg-info/
+dist/
+build/
+*.egg
+venv/
+.env
+
+# Node / Next.js
+node_modules/
+.next/
+out/
+.npm-cache/
+
+# IDE
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+
+# OS
+.DS_Store
+Thumbs.db
+Desktop.ini
+
+# Output / Runtime
+backend/output/
+backend/temp/
+backend/samples/
+
+# Test PDFs and sample docs (user-specific)
+*.pdf
+说明书范本.docx
+权利要求书范本.docx
+说明书摘要范本.docx
+
+# Gemini agent
+.gemini/
