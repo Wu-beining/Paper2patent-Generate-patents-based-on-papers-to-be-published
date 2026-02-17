@@ -31,7 +31,7 @@ print("[3/3] 监控 SSE 流式输出...")
 print("=" * 60)
 
 try:
-    response = requests.get(f"{API_BASE}/stream/{task_id}", stream=True, timeout=1200)
+    response = requests.get(f"{API_BASE}/stream/{task_id}", stream=True, timeout=1800)
     for line in response.iter_lines(decode_unicode=True):
         if line and line.startswith("data: "):
             raw = line[6:]
@@ -46,6 +46,10 @@ try:
                     sys.stdout.flush()
                 elif msg["type"] == "file_ready":
                     print(f"\n  [✅ 文件就绪: {msg['doc_type']}]")
+                elif msg["type"] == "figure_ready":
+                    print(f"\n  [🎨 附图就绪: 图{msg['index']+1}/{msg['total']}]")
+                elif msg["type"] == "log":
+                    print(f"\n  [LOG] {msg['message']}")
                 elif msg["type"] == "error":
                     print(f"\n  [❌ 错误: {msg['message']}]")
                 elif msg["type"] == "done":
@@ -53,6 +57,8 @@ try:
                     print(f">>> 完成! 状态: {msg['status']}")
                     if msg.get("files"):
                         print(f"  生成文件: {list(msg['files'].keys())}")
+                    if msg.get("figures"):
+                        print(f"  生成附图: {msg['figures']} 张")
                     if msg.get("error"):
                         print(f"  错误: {msg['error']}")
                     break

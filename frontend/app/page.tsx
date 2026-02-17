@@ -1,14 +1,15 @@
 "use client";
 
-import { useState, useEffect, useRef, useCallback } from "react";
+import { useState, useRef, useCallback } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import {
     FileUp, Key, Upload, ChevronDown,
-    FileText, Sparkles, ArrowRight
+    FileText, Sparkles, ArrowRight, Terminal
 } from "lucide-react";
 import WorkflowPipeline, { StepData } from "@/components/WorkflowPipeline";
 import StatusCard from "@/components/StatusCard";
 import DownloadCenter from "@/components/DownloadCenter";
+import LogPanel from "@/components/LogPanel";
 
 const API_BASE = "http://localhost:8000/api";
 
@@ -19,6 +20,7 @@ const INITIAL_STEPS: StepData[] = [
     { id: "3", label: "权利要求书", status: "pending" },
     { id: "4", label: "说明书摘要", status: "pending" },
     { id: "5", label: "附图提示词", status: "pending" },
+    { id: "6", label: "附图生成", status: "pending" },
 ];
 
 type Phase = "hero" | "config" | "generating" | "done";
@@ -47,7 +49,12 @@ export default function Home() {
     const [isStreaming, setIsStreaming] = useState(false);
     const [isDone, setIsDone] = useState(false);
     const [files, setFiles] = useState<Record<string, string>>({});
+    const [figureCount, setFigureCount] = useState(0);
     const [error, setError] = useState("");
+
+    // Log State
+    const [logs, setLogs] = useState<string[]>([]);
+    const [showLog, setShowLog] = useState(false);
 
     const contentRef = useRef("");
 
@@ -80,6 +87,8 @@ export default function Home() {
         setCurrentContent("");
         setIsDone(false);
         setFiles({});
+        setFigureCount(0);
+        setLogs([]);
 
         const formData = new FormData();
         formData.append("file", pdfFile);
@@ -132,6 +141,15 @@ export default function Home() {
                     setFiles((prev) => ({ ...prev, [msg.doc_type]: msg.doc_type }));
                 }
 
+                if (msg.type === "figure_ready") {
+                    setFigureCount(msg.index + 1);
+                }
+
+                if (msg.type === "log") {
+                    const ts = new Date().toLocaleTimeString("zh-CN", { hour12: false });
+                    setLogs((prev) => [...prev, `[${ts}] ${msg.message}`]);
+                }
+
                 if (msg.type === "error") {
                     setError(msg.message);
                     setIsStreaming(false);
@@ -144,6 +162,7 @@ export default function Home() {
                         setSteps((prev) => prev.map((s) => ({ ...s, status: "completed" as const })));
                         setIsDone(true);
                         setFiles(msg.files || {});
+                        setFigureCount(msg.figures || 0);
                         setPhase("done");
                     } else {
                         setError(msg.error || "任务失败");
@@ -167,6 +186,35 @@ export default function Home() {
             {/* Animated gradient background */}
             <div className="gradient-bg" />
 
+            {/* Floating Log Button (visible during generating & done) */}
+            {(phase === "generating" || phase === "done") && (
+                <motion.button
+                    initial={{ scale: 0 }}
+                    animate={{ scale: 1 }}
+                    transition={{ type: "spring", stiffness: 300, damping: 20 }}
+                    onClick={() => setShowLog((v) => !v)}
+                    className={`fixed bottom-6 right-6 z-50 w-12 h-12 rounded-full flex items-center justify-center shadow-lg transition-colors ${showLog
+                            ? "bg-[var(--accent)] text-white"
+                            : "bg-white/80 dark:bg-zinc-800/80 backdrop-blur-xl text-[var(--text-secondary)] border border-[var(--border-subtle)]"
+                        }`}
+                    title="查看运行日志"
+                >
+                    <Terminal className="w-5 h-5" />
+                    {logs.length > 0 && !showLog && (
+                        <span className="absolute -top-1 -right-1 w-5 h-5 rounded-full bg-red-500 text-white text-[10px] flex items-center justify-center font-medium">
+                            {logs.length > 99 ? "99+" : logs.length}
+                        </span>
+                    )}
+                </motion.button>
+            )}
+
+            {/* Log Panel Overlay */}
+            <AnimatePresence>
+                {showLog && (
+                    <LogPanel logs={logs} onClose={() => setShowLog(false)} />
+                )}
+            </AnimatePresence>
+
             <AnimatePresence mode="wait">
                 {/* ==================== HERO ==================== */}
                 {phase === "hero" && (
@@ -179,7 +227,6 @@ export default function Home() {
                         className="section-container"
                     >
                         <div className="flex flex-col items-center text-center max-w-2xl">
-                            {/* Logo / Brand */}
                             <motion.div
                                 initial={{ scale: 0.8, opacity: 0 }}
                                 animate={{ scale: 1, opacity: 1 }}
@@ -191,7 +238,6 @@ export default function Home() {
                                 </div>
                             </motion.div>
 
-                            {/* App Name */}
                             <motion.h1
                                 initial={{ y: 20, opacity: 0 }}
                                 animate={{ y: 0, opacity: 1 }}
@@ -201,7 +247,6 @@ export default function Home() {
                                 Paper2Patent
                             </motion.h1>
 
-                            {/* Slogan with character-by-character animation */}
                             <motion.p
                                 initial={{ opacity: 0 }}
                                 animate={{ opacity: 1 }}
@@ -220,7 +265,6 @@ export default function Home() {
                                 ))}
                             </motion.p>
 
-                            {/* CTA Button */}
                             <motion.button
                                 initial={{ y: 20, opacity: 0 }}
                                 animate={{ y: 0, opacity: 1 }}
@@ -232,7 +276,6 @@ export default function Home() {
                                 <ArrowRight className="w-5 h-5" />
                             </motion.button>
 
-                            {/* Scroll hint */}
                             <motion.div
                                 initial={{ opacity: 0 }}
                                 animate={{ opacity: 1 }}
@@ -262,7 +305,6 @@ export default function Home() {
                         style={{ minHeight: "100vh" }}
                     >
                         <div className="w-full max-w-3xl space-y-8">
-                            {/* Section Title */}
                             <motion.div
                                 initial={{ y: -10, opacity: 0 }}
                                 animate={{ y: 0, opacity: 1 }}
@@ -330,7 +372,6 @@ export default function Home() {
                                 </div>
 
                                 <div className="grid grid-cols-2 gap-4">
-                                    {/* Main PDF — larger card */}
                                     <UploadCard
                                         label="论文原文"
                                         accept=".pdf"
@@ -365,14 +406,12 @@ export default function Home() {
                                 </div>
                             </motion.div>
 
-                            {/* Error */}
                             {error && (
                                 <div className="p-4 rounded-2xl bg-red-50 dark:bg-red-950/30 border border-red-200 dark:border-red-800 text-red-600 dark:text-red-400 text-sm">
                                     ⚠️ {error}
                                 </div>
                             )}
 
-                            {/* Start Button */}
                             <motion.div
                                 initial={{ y: 20, opacity: 0 }}
                                 animate={{ y: 0, opacity: 1 }}
@@ -410,7 +449,6 @@ export default function Home() {
                         transition={{ duration: 0.5 }}
                         className="min-h-screen flex flex-col items-center px-6 py-8"
                     >
-                        {/* Header */}
                         <motion.div
                             initial={{ y: -10, opacity: 0 }}
                             animate={{ y: 0, opacity: 1 }}
@@ -422,12 +460,10 @@ export default function Home() {
                             </p>
                         </motion.div>
 
-                        {/* Workflow Pipeline */}
                         <div className="w-full max-w-5xl mb-6">
                             <WorkflowPipeline steps={steps} />
                         </div>
 
-                        {/* Mini Terminal */}
                         <div className="w-full max-w-5xl mb-8">
                             <StatusCard
                                 title={currentStepLabel}
@@ -436,7 +472,6 @@ export default function Home() {
                             />
                         </div>
 
-                        {/* Error */}
                         {error && (
                             <div className="w-full max-w-5xl p-4 rounded-2xl bg-red-50 dark:bg-red-950/30 border border-red-200 dark:border-red-800 text-red-600 dark:text-red-400 text-sm mb-8">
                                 ⚠️ {error}
@@ -454,7 +489,6 @@ export default function Home() {
                         transition={{ duration: 0.6, ease: [0.25, 0.46, 0.45, 0.94] }}
                         className="min-h-screen flex flex-col items-center px-6 py-12"
                     >
-                        {/* Celebration Header */}
                         <motion.div
                             initial={{ y: -20, opacity: 0 }}
                             animate={{ y: 0, opacity: 1 }}
@@ -473,17 +507,15 @@ export default function Home() {
                             <p className="text-[var(--text-secondary)] text-sm">全部文档已准备就绪，可预览或下载</p>
                         </motion.div>
 
-                        {/* Pipeline summary */}
                         <div className="w-full max-w-5xl mb-8">
                             <WorkflowPipeline steps={steps} />
                         </div>
 
-                        {/* Download Center */}
+                        {/* Download Center + Figures */}
                         <div className="w-full max-w-3xl">
-                            <DownloadCenter taskId={taskId} files={files} />
+                            <DownloadCenter taskId={taskId} files={files} figureCount={figureCount} />
                         </div>
 
-                        {/* Restart */}
                         <motion.button
                             initial={{ opacity: 0 }}
                             animate={{ opacity: 1 }}
@@ -495,8 +527,10 @@ export default function Home() {
                                 setCurrentContent("");
                                 setIsDone(false);
                                 setFiles({});
+                                setFigureCount(0);
                                 setPdfFile(null);
                                 setError("");
+                                setLogs([]);
                             }}
                             className="btn-secondary mt-10"
                         >
