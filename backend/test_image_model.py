@@ -3,7 +3,11 @@ import asyncio
 import os
 import json
 
-os.environ["OPENROUTER_API_KEY"] = "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"
+api_key = os.environ.get("OPENROUTER_API_KEY", "")
+if not api_key:
+    print("请先设置 OPENROUTER_API_KEY 环境变量")
+    exit(1)
+os.environ["OPENROUTER_API_KEY"] = api_key
 
 from services.llm_engine import get_client, MODEL_IMAGE_GEN
 
